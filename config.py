@@ -4,4 +4,7 @@ import os
 
 load_dotenv()
 
-DATABASE_URL = os.getenv('DB_LINK')
+if os.getenv('DB_LINK'):
+    DATABASE_URL = os.getenv('DB_LINK')
+else:
+    raise ValueError("The database url is not set in .env")
