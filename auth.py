@@ -2,7 +2,7 @@ from config import JWT_SECRET_KEY
 import bcrypt
 
 from datetime import datetime, timedelta, timezone
-from jose import jwt, excpetions
+from jose import jwt, exceptions
 
 
 #bcrypt password hashing and checking functions
@@ -32,7 +32,7 @@ def decode_jwt(token : str) -> dict:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithm = "HS256")
         return payload
     except exceptions.JWTError as e:
-        print("Error :" e)
+        print("Error :", e)
         return None
     except exceptions.ExpiredSignatureError:
         print("Error : Token has expired.")
