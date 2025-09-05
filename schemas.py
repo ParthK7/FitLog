@@ -1,9 +1,5 @@
 from pydantic import BaseModel, EmailStr
 
-class LoginModel(BaseModel):
-    username : str
-    password : str
-
 class RegistrationModel(BaseModel):
     username : str
     password : str
@@ -16,3 +12,15 @@ class RegisterUserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LoginModel(BaseModel):
+    username_or_email : str
+    password : str
+
+class LoginUserOut(BaseModel):
+    id : int
+    username : str
+    email : str
+    jwt_token : str
+    message : str
+
