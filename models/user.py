@@ -2,7 +2,8 @@ from .base import Base
 from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, Text
 from sqlalchemy.sql import func 
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import List
 
 class User(Base):
     __tablename__ = "users"
@@ -27,3 +28,7 @@ class User(Base):
     )
 
     email : Mapped[str] = mapped_column(String, unique = True)
+
+    exercises : Mapped[list["Exercise"]] = relationship(back_populates = "user", cascade="all,delete-orphan")
+
+    workouts : Mapped[list["Workout"]] = relationship(back_populates = "user", cascade = "all,delete-orphan")

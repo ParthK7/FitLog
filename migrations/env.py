@@ -9,6 +9,9 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from models.base import Base
 from models.user import User
+from models.exercise import Exercise
+from models.workout import Workout
+from models.workout_exercise import WorkoutExercise
 from alembic import context
 
 # this is the Alembic Config object, which provides
