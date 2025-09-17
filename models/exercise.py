@@ -33,5 +33,5 @@ class Exercise(Base):
     user_id : Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
     user  : Mapped["User"] = relationship(back_populates = "exercises")
 
-    workout_exercises : Mapped[list["Workout_Exercise"]] = relationship(back_populates = "exercise")
+    workout_exercises : Mapped[list["WorkoutExercise"]] = relationship(back_populates = "exercise")
      

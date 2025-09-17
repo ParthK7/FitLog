@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from datetime import datetime
 
 class RegistrationModel(BaseModel):
     username : str
@@ -23,4 +24,20 @@ class LoginUserOut(BaseModel):
     email : str
     jwt_token : str
     message : str
+
+
+class ExerciseCreation(BaseModel):
+    name : str
+    description : str
+
+class ExerciseCreationResponse(BaseModel):
+    exercise_id : int
+    name : str
+    description : str
+    user_id : int
+    created_at : datetime
+    updated_at : datetime
+
+    class Config: 
+        from_attributes = True
 

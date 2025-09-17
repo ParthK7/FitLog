@@ -3,7 +3,8 @@ import bcrypt
 
 from datetime import datetime, timedelta, timezone
 from jose import jwt, exceptions
-
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
 
 #bcrypt password hashing and checking functions
 def passlib_hash_password(password : str) -> str:
@@ -29,7 +30,7 @@ def create_jwt(payload : dict, expires_delta : timedelta | None = None) -> str:
 
 def decode_jwt(token : str) -> dict:
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithm = "HS256")
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms = ["HS256"])
         return payload
     except exceptions.JWTError as e:
         print("Error :", e)
@@ -40,3 +41,15 @@ def decode_jwt(token : str) -> dict:
     except Exception as e:
         print("Error : An unexpected error occured ->", e)
         return None
+
+security = HTTPBearer()
+def validate_jwt(credentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_jwt(token)
+    if payload:
+        return payload
+    else:
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED,
+            detail = "Unauthorized access"
+        )
