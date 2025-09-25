@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Security
-from schemas import RegistrationModel, RegisterUserOut, LoginModel, LoginUserOut, ExerciseCreation, ExerciseCreationResponse
+from fastapi import FastAPI, Depends, HTTPException, status, Security, Path
+from schemas import RegistrationModel, RegisterUserOut, LoginModel, LoginUserOut, ExerciseCreation, ExerciseCreationResponse, AllExercisesRetrievalResponse, SingleExerciseResponse
 from database import get_db
 from auth import passlib_hash_password, verify_password, create_jwt, decode_jwt, validate_jwt
 from models.user import User
@@ -7,7 +7,7 @@ from models.exercise import Exercise
 from models.workout import Workout
 from models.workout_exercise import WorkoutExercise
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_ 
+from sqlalchemy import select, or_, and_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import timedelta
 from fastapi.openapi.utils import get_openapi
@@ -118,7 +118,9 @@ async def login_user(user : LoginModel, db : Session = Depends(get_db)):
         "message" : "Login Successful."
     }
 
-@app.post("/create_exercise", response_model = ExerciseCreationResponse, openapi_extra={"security": [{"bearerAuth": []}]})
+# CRUD operations for Exercises:-
+# 1. CREATE
+@app.post("/exercises", response_model = ExerciseCreationResponse, openapi_extra={"security": [{"bearerAuth": []}]})
 async def create_exercise(exercise_data : ExerciseCreation, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
 
@@ -141,7 +143,7 @@ async def create_exercise(exercise_data : ExerciseCreation, user : dict = Securi
         db.rollback()
         raise HTTPException(
             status_code = status.HTTP_400_BAD_REQUEST, 
-            detail = "A database integrity error occurred"
+            detail = "A database integrity error occurred."
         )
     except SQLAlchemyError:
         db.rollback()
@@ -151,5 +153,102 @@ async def create_exercise(exercise_data : ExerciseCreation, user : dict = Securi
         )
 
     return new_exercise
+
+# 2. READ all exercises for a user
+@app.get("/exercises", response_model = list[AllExercisesRetrievalResponse], openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def get_all_exercises_for_user(user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = select(Exercise).where(Exercise.user_id == user_id)
+    all_exercises = db.scalars(statement).all()
+
+    return all_exercises
+
+#3 READ exercise by exercise_id
+@app.get("/exercises/{exercise_id}", response_model = AllExercisesRetrievalResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def get_single_exercise(exercise_id : int = Path(..., title = "ID of exercise to retrieve."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = select(Exercise).where(and_(Exercise.exercise_id == exercise_id , Exercise.user_id == user_id))
+    requested_exercise = db.scalars(statement).one_or_none()
+
+    if not requested_exercise:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND, 
+            detail = "Exercise not found or does not belong to this user."
+        )
+    
+    return requested_exercise
+
+#4 Update exercise
+@app.put("/exercises/{exercise_id}", response_model = AllExercisesRetrievalResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def edit_exercise(exercise_details : ExerciseCreation, exercise_id : int = Path(..., title = "ID of the exercise to be edited."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = select(Exercise).where(and_(Exercise.exercise_id == exercise_id, Exercise.user_id == user_id))
+    requested_exercise = db.scalars(statement).one_or_none()
+
+    if not requested_exercise:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND, 
+            detail = "Exercise not found or does not belong to this user."
+        )
+    
+    requested_exercise.name = exercise_details.name.lower()
+    requested_exercise.description = exercise_details.description
+
+    try:
+        db.add(requested_exercise)
+        db.commit()
+        db.refresh(requested_exercise)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "A database integrity error occurred.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )
+
+    return requested_exercise
+
+#5 Delete exercise
+@app.delete("/exercises/{exercise_id}", openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def delete_exercise(*, exercise_id : int = Path(..., title = "ID of the exercise to be deleted."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+    
+    statement = select(Exercise).where(and_(Exercise.exercise_id == exercise_id, Exercise.user_id == user_id))
+    exercise_to_be_deleted = db.scalars(statement).one_or_none()
+
+    if not exercise_to_be_deleted:
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "Exercise not found or does not belong to the user."
+        )
+
+    try:
+        db.delete(exercise_to_be_deleted)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "A database integrity error occurred.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )
+    
+    return status.HTTP_204_NO_CONTENT
+    
+
+
     
     

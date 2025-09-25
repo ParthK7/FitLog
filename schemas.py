@@ -41,3 +41,22 @@ class ExerciseCreationResponse(BaseModel):
     class Config: 
         from_attributes = True
 
+class AllExercisesRetrievalResponse(BaseModel):
+    exercise_id : int
+    name : str
+    description : str
+    created_at : datetime
+    updated_at : datetime
+
+    class Config:
+        from_attributes = True
+
+class SingleExerciseResponse(BaseModel):
+    exercise_id : int
+    name : str
+    description : str
+    created_at : datetime
+    updated_at : datetime
+
+    class Config:
+        from_attributes = True
