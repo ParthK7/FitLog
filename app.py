@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Security, Path
-from schemas import RegistrationModel, RegisterUserOut, LoginModel, LoginUserOut, ExerciseCreation, ExerciseCreationResponse, AllExercisesRetrievalResponse, SingleExerciseResponse
+from schemas import RegistrationModel, RegisterUserOut, LoginModel, LoginUserOut, ExerciseCreation, ExerciseCreationResponse, AllExercisesRetrievalResponse, WorkoutRequest, WorkoutResponse, WorkoutExerciseRequest, WorkoutExerciseResponse
 from database import get_db
 from auth import passlib_hash_password, verify_password, create_jwt, decode_jwt, validate_jwt
 from models.user import User
@@ -247,7 +247,136 @@ async def delete_exercise(*, exercise_id : int = Path(..., title = "ID of the ex
         )
     
     return status.HTTP_204_NO_CONTENT
+
+@app.post("/workouts", response_model = WorkoutResponse, openapi_extra = {"security": [{"bearerAuth" : []}]})
+async def create_workout(workout_data : WorkoutRequest, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    new_workout = Workout(
+        name = workout_data.name,
+        description = workout_data.description,
+        date = workout_data.date,
+        start_time = workout_data.start_time, 
+        end_time = workout_data.end_time,
+        user_id = user_id
+    )
+
+    try:
+        db.add(new_workout)
+        db.commit()
+        db.refresh(new_workout)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST, 
+            detail = "A database integrity error occurred."
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="A database error occurred."
+        )
     
+    return new_workout
+
+@app.get("/workouts", response_model = list[WorkoutResponse], openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def get_all_workouts_for_user(user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = select(Workout).where(Workout.user_id == user_id)
+    all_workouts = db.scalars(statement).all()
+
+    return all_workouts
+
+@app.get("/workouts/{workout_id}", response_model = WorkoutResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def get_single_workout(workout_id : int = Path(..., title = "ID of workout to retrieve."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = select(Workout).where(and_(Workout.workout_id == workout_id , Workout.user_id == user_id))
+    requested_workout = db.scalars(statement).one_or_none()
+
+    if not requested_workout:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND, 
+            detail = "Workout not found or does not belong to this user."
+        )
+    
+    return requested_workout
+
+@app.put("/workouts/{workout_id}", response_model = WorkoutResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def edit_workout(workout_details : WorkoutRequest, workout_id : int = Path(..., title = "ID of the exercise to be edited."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = select(Workout).where(and_(Workout.workout_id == workout_id, Workout.user_id == user_id))
+    requested_workout = db.scalars(statement).one_or_none()
+
+    if not requested_workout:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND, 
+            detail = "Exercise not found or does not belong to this user."
+        )
+
+    requested_workout.name = workout_details.name
+    requested_workout.description = workout_details.description
+    requested_workout.date = workout_details.date
+    requested_workout.start_time = workout_details.start_time
+    requested_workout.end_time = workout_details.end_time
+
+    try:
+        db.add(requested_workout)
+        db.commit()
+        db.refresh(requested_workout)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "A database integrity error occurred.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )
+
+    return requested_workout
+
+@app.delete("/workouts/{workout_id}", openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def delete_workout(*, workout_id : int = Path(..., title = "ID of the workout to be deleted."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
+    
+    statement = select(Workout).where(and_(Workout.workout_id == workout_id, Workout.user_id == user_id))
+    workout_to_be_deleted = db.scalars(statement).one_or_none()
+
+    if not workout_to_be_deleted:
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "Exercise not found or does not belong to the user."
+        )
+
+    try:
+        db.delete(workout_to_be_deleted)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "A database integrity error occurred.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )
+    
+    return status.HTTP_204_NO_CONTENT
+
+# #Create WorkoutExercise
+# @app.post("/workoutexercise", response_model = WorkoutExerciseResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
+# async def create_workout_exercise(set_data : WorkoutExerciseRequest, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+#     user_id : int(user["sub"])
 
 
     
