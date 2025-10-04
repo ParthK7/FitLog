@@ -373,11 +373,42 @@ async def delete_workout(*, workout_id : int = Path(..., title = "ID of the work
     
     return status.HTTP_204_NO_CONTENT
 
-# #Create WorkoutExercise
-# @app.post("/workoutexercise", response_model = WorkoutExerciseResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
-# async def create_workout_exercise(set_data : WorkoutExerciseRequest, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
-#     user_id : int(user["sub"])
+#Create Workout Exercise
+@app.post("/workoutexercises", response_model = WorkoutExerciseResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
+async def create_workoutexercise(workout_exercise_data : WorkoutExerciseRequest, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
+    user_id = int(user["sub"])
 
+    query = select(
+        and_(
+            select(Exercise).where(Exercise.exercise_id == workout_exercise_data.exercise_id, Exercise.user_id == user_id).exists(),
+            select(Workout).where(Workout.workout_id == workout_exercise_data.workout_id, Workout.user_id == user_id).exists()
+        )
+    )
 
-    
-    
+    result = db.scalars(query).one_or_none()
+
+    if not result:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Resource not found or unauthorized access."
+        )
+
+    new_workout_exercise = WorkoutExercise(**workout_exercise_data.model_dump())
+
+    try:
+        db.add(new_workout_exercise)
+        db.commit()
+        db.refresh(new_workout_exercise)
+        return new_workout_exercise
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_409_CONFLICT,
+            detail = "An entry with the given workout, exercise, and set number already exists.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )

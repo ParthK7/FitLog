@@ -77,15 +77,16 @@ class WorkoutResponse(BaseModel):
         from_attributes = True
 
 class WorkoutExerciseRequest(BaseModel):
+    workout_id : int
+    exercise_id : int
     set_number : int
     weight : int
     reps : int 
 
 class WorkoutExerciseResponse(BaseModel):
-    user_id : int
-    set_number : int
     workout_id : int
     exercise_id : int
+    set_number : int
     weight : int
     reps : int
     created_at : datetime
