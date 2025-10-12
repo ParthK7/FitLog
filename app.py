@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Security, Path
-from schemas import RegistrationModel, RegisterUserOut, LoginModel, LoginUserOut, ExerciseCreation, ExerciseCreationResponse, AllExercisesRetrievalResponse, WorkoutRequest, WorkoutResponse, WorkoutExerciseRequest, WorkoutExerciseResponse
+from schemas import RegistrationModel, RegisterUserOut, LoginModel, LoginUserOut, PRResponse, ExerciseCreation, ExerciseCreationResponse, AllExercisesRetrievalResponse, WorkoutRequest, WorkoutResponse, WorkoutExerciseRequest, WorkoutExerciseResponse
 from database import get_db
 from auth import passlib_hash_password, verify_password, create_jwt, decode_jwt, validate_jwt
 from models.user import User
@@ -11,6 +11,7 @@ from sqlalchemy import select, or_, and_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import timedelta
 from fastapi.openapi.utils import get_openapi
+from sqlalchemy.sql import func
 
 
 app = FastAPI()
@@ -257,7 +258,6 @@ async def create_workout(workout_data : WorkoutRequest, user : dict = Security(v
         description = workout_data.description,
         date = workout_data.date,
         start_time = workout_data.start_time, 
-        end_time = workout_data.end_time,
         user_id = user_id
     )
 
@@ -321,7 +321,6 @@ async def edit_workout(workout_details : WorkoutRequest, workout_id : int = Path
     requested_workout.description = workout_details.description
     requested_workout.date = workout_details.date
     requested_workout.start_time = workout_details.start_time
-    requested_workout.end_time = workout_details.end_time
 
     try:
         db.add(requested_workout)
@@ -412,3 +411,129 @@ async def create_workoutexercise(workout_exercise_data : WorkoutExerciseRequest,
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = "A database error occurred."
         )
+
+# get all sets from a workout
+@app.get("/workouts/{workout_id}/sets", response_model = list[WorkoutExerciseResponse], openapi_extra={"security": [{"bearerAuth": []}]})
+async def get_all_sets_from_workout(workout_id: int = Path(..., title="ID of the workout to retrieve sets for."), user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    # ensure workout belongs to user
+    statement = select(Workout).where(and_(Workout.workout_id == workout_id, Workout.user_id == user_id))
+    workout = db.scalars(statement).one_or_none()
+
+    if not workout:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Workout not found or does not belong to this user."
+        )
+
+    sets_stmt = select(WorkoutExercise).where(WorkoutExercise.workout_id == workout_id)
+    sets = db.scalars(sets_stmt).all()
+
+    return sets
+
+
+@app.get("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", response_model = WorkoutExerciseResponse, openapi_extra={"security": [{"bearerAuth": []}]})
+async def get_single_set_from_workout(workout_id: int = Path(..., title="Workout ID"), exercise_id: int = Path(..., title="Exercise ID"), set_number: int = Path(..., title="Set number"), user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number, Workout.user_id == user_id)).join(Workout)
+    requested_set = db.scalars(stmt).one_or_none()
+
+    if not requested_set:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Set not found or does not belong to this user."
+        )
+
+    return requested_set
+
+
+@app.put("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", response_model = WorkoutExerciseResponse, openapi_extra={"security": [{"bearerAuth": []}]})
+async def edit_set_from_workout(workout_id: int = Path(..., title="Workout ID"), exercise_id: int = Path(..., title="Exercise ID"), set_number: int = Path(..., title="Set number"), set_details: WorkoutExerciseRequest = None, user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number)).join(Workout)
+    requested_set = db.scalars(stmt).one_or_none()
+
+    # ensure the workout belongs to the user
+    if not requested_set or requested_set.workout.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Set not found or does not belong to this user."
+        )
+
+    # Update fields - allow updating weight and reps (and set_number only if consistent)
+    # If client wants to change identifying keys (exercise_id or set_number), safe approach is to reject or require delete+create.
+    requested_set.weight = set_details.weight
+    requested_set.reps = set_details.reps
+
+    try:
+        db.add(requested_set)
+        db.commit()
+        db.refresh(requested_set)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "A database integrity error occurred.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )
+
+    return requested_set
+
+
+@app.delete("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", openapi_extra={"security": [{"bearerAuth": []}]})
+async def delete_set_from_workout(workout_id: int = Path(..., title="Workout ID"), exercise_id: int = Path(..., title="Exercise ID"), set_number: int = Path(..., title="Set number"), user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number)).join(Workout)
+    set_to_delete = db.scalars(stmt).one_or_none()
+
+    if not set_to_delete or set_to_delete.workout.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Set not found or does not belong to this user."
+        )
+
+    try:
+        db.delete(set_to_delete)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "A database integrity error occurred.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "A database error occurred."
+        )
+
+    return status.HTTP_204_NO_CONTENT
+
+
+@app.get("/prs", response_model = list[PRResponse], openapi_extra={"security": [{"bearerAuth": []}]})
+async def return_prs(user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
+    user_id = int(user["sub"])
+
+    statement = (
+        select(Exercise.name, func.max(WorkoutExercise.weight).label("weight"))
+        .join(Exercise)
+        .join(Workout)
+        .where(Workout.user_id == user_id)
+        .group_by(Exercise.exercise_id, Exercise.name)
+    )
+
+    results = db.execute(statement).all()
+
+    return [PRResponse.model_validate(row, from_attributes = True) for row in results]
+
+

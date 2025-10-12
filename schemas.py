@@ -57,7 +57,6 @@ class WorkoutRequest(BaseModel):
     description : Optional[str] = None
     date : date #YYYY-MM-DD
     start_time : datetime #YYYY-MM-DD HH:MI:SS
-    end_time : Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -68,7 +67,6 @@ class WorkoutResponse(BaseModel):
     description : Optional[str] = None
     date : date
     start_time : datetime
-    end_time : Optional[datetime] = None
     created_at : datetime
     updated_at : datetime
     user_id : int
@@ -91,3 +89,8 @@ class WorkoutExerciseResponse(BaseModel):
     reps : int
     created_at : datetime
     updated_at : datetime
+
+class PRResponse(BaseModel):
+    name : str
+    weight : float
+    

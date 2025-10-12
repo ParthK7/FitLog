@@ -16,7 +16,6 @@ class Workout(Base):
     date : Mapped[date] = mapped_column(Date, nullable = False)
 
     start_time : Mapped[datetime] = mapped_column(DateTime(timezone = True), nullable = False)
-    end_time : Mapped[datetime] = mapped_column(DateTime(timezone = True), nullable = True)
 
     created_at : Mapped[datetime] = mapped_column(
         DateTime(timezone = True),
