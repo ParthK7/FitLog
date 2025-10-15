@@ -17,8 +17,20 @@ from alembic import context
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-DB_URL = os.environ.get("DB_LINK", config.get_main_option("sqlalchemy.url"))
-print("Alembic is using this URL", DB_URL)
+
+def get_db_url():
+    args = context.get_x_argument(as_dictionary = True)
+    if args.get("db") == "test":
+        DB_URL = os.environ.get("TEST_DB_LINK", config.get_main_option("sqlalchemy.url"))
+    else:
+        DB_URL = os.environ.get("DB_LINK", config.get_main_option("sqlalchemy.url"))
+    
+    if DB_URL is None:
+        raise ValueError("Database is not set. Check .env file or command.")
+    
+    print(f"Alembic is using this database URL: {DB_URL}")
+
+    return DB_URL
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -49,7 +61,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_db_url()
+    # url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -71,7 +84,7 @@ def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
-        url = DB_URL,
+        url = get_db_url(),
         poolclass=pool.NullPool,
     )
 
