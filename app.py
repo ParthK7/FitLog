@@ -170,29 +170,40 @@ async def get_all_exercises_for_user(user : dict = Security(validate_jwt), db : 
 async def get_single_exercise(exercise_id : int = Path(..., title = "ID of exercise to retrieve."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
 
-    statement = select(Exercise).where(and_(Exercise.exercise_id == exercise_id , Exercise.user_id == user_id))
-    requested_exercise = db.scalars(statement).one_or_none()
+    by_id_stmt = select(Exercise).where(Exercise.exercise_id == exercise_id)
+    exercise_obj = db.scalars(by_id_stmt).one_or_none()
 
-    if not requested_exercise:
+    if not exercise_obj:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND, 
-            detail = "Exercise not found or does not belong to this user."
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Exercise not found."
         )
-    
-    return requested_exercise
+
+    if exercise_obj.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Forbidden: you do not have permission to access this exercise."
+        )
+
+    return exercise_obj
 
 #4 Update exercise
 @app.put("/exercises/{exercise_id}", response_model = AllExercisesRetrievalResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
 async def edit_exercise(exercise_details : ExerciseCreation, exercise_id : int = Path(..., title = "ID of the exercise to be edited."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
-
-    statement = select(Exercise).where(and_(Exercise.exercise_id == exercise_id, Exercise.user_id == user_id))
-    requested_exercise = db.scalars(statement).one_or_none()
+    by_id_stmt = select(Exercise).where(Exercise.exercise_id == exercise_id)
+    requested_exercise = db.scalars(by_id_stmt).one_or_none()
 
     if not requested_exercise:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND, 
-            detail = "Exercise not found or does not belong to this user."
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Exercise not found."
+        )
+
+    if requested_exercise.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Forbidden: you do not have permission to modify this exercise."
         )
     
     requested_exercise.name = exercise_details.name.lower()
@@ -218,17 +229,22 @@ async def edit_exercise(exercise_details : ExerciseCreation, exercise_id : int =
     return requested_exercise
 
 #5 Delete exercise
-@app.delete("/exercises/{exercise_id}", openapi_extra = {"security" : [{"bearerAuth" : []}]})
+@app.delete("/exercises/{exercise_id}", status_code = status.HTTP_204_NO_CONTENT, openapi_extra = {"security" : [{"bearerAuth" : []}]})
 async def delete_exercise(*, exercise_id : int = Path(..., title = "ID of the exercise to be deleted."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
-    
-    statement = select(Exercise).where(and_(Exercise.exercise_id == exercise_id, Exercise.user_id == user_id))
-    exercise_to_be_deleted = db.scalars(statement).one_or_none()
+    by_id_stmt = select(Exercise).where(Exercise.exercise_id == exercise_id)
+    exercise_to_be_deleted = db.scalars(by_id_stmt).one_or_none()
 
     if not exercise_to_be_deleted:
         raise HTTPException(
-            status_code = status.HTTP_400_BAD_REQUEST,
-            detail = "Exercise not found or does not belong to the user."
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Exercise not found."
+        )
+
+    if exercise_to_be_deleted.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Forbidden: you do not have permission to delete this exercise."
         )
 
     try:
@@ -247,7 +263,7 @@ async def delete_exercise(*, exercise_id : int = Path(..., title = "ID of the ex
             detail = "A database error occurred."
         )
     
-    return status.HTTP_204_NO_CONTENT
+    return None
 
 @app.post("/workouts", response_model = WorkoutResponse, openapi_extra = {"security": [{"bearerAuth" : []}]})
 async def create_workout(workout_data : WorkoutRequest, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
@@ -292,29 +308,40 @@ async def get_all_workouts_for_user(user : dict = Security(validate_jwt), db : S
 @app.get("/workouts/{workout_id}", response_model = WorkoutResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
 async def get_single_workout(workout_id : int = Path(..., title = "ID of workout to retrieve."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
-
-    statement = select(Workout).where(and_(Workout.workout_id == workout_id , Workout.user_id == user_id))
-    requested_workout = db.scalars(statement).one_or_none()
+    # First check existence
+    by_id_stmt = select(Workout).where(Workout.workout_id == workout_id)
+    requested_workout = db.scalars(by_id_stmt).one_or_none()
 
     if not requested_workout:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND, 
-            detail = "Workout not found or does not belong to this user."
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Workout not found."
         )
-    
+
+    if requested_workout.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Forbidden: you do not have permission to access this workout."
+        )
+
     return requested_workout
 
 @app.put("/workouts/{workout_id}", response_model = WorkoutResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
 async def edit_workout(workout_details : WorkoutRequest, workout_id : int = Path(..., title = "ID of the exercise to be edited."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
-
-    statement = select(Workout).where(and_(Workout.workout_id == workout_id, Workout.user_id == user_id))
-    requested_workout = db.scalars(statement).one_or_none()
+    by_id_stmt = select(Workout).where(Workout.workout_id == workout_id)
+    requested_workout = db.scalars(by_id_stmt).one_or_none()
 
     if not requested_workout:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND, 
-            detail = "Exercise not found or does not belong to this user."
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Workout not found."
+        )
+
+    if requested_workout.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Forbidden: you do not have permission to modify this workout."
         )
 
     requested_workout.name = workout_details.name
@@ -341,17 +368,22 @@ async def edit_workout(workout_details : WorkoutRequest, workout_id : int = Path
 
     return requested_workout
 
-@app.delete("/workouts/{workout_id}", openapi_extra = {"security" : [{"bearerAuth" : []}]})
+@app.delete("/workouts/{workout_id}", status_code = status.HTTP_204_NO_CONTENT, openapi_extra = {"security" : [{"bearerAuth" : []}]})
 async def delete_workout(*, workout_id : int = Path(..., title = "ID of the workout to be deleted."), user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
-    
-    statement = select(Workout).where(and_(Workout.workout_id == workout_id, Workout.user_id == user_id))
-    workout_to_be_deleted = db.scalars(statement).one_or_none()
+    by_id_stmt = select(Workout).where(Workout.workout_id == workout_id)
+    workout_to_be_deleted = db.scalars(by_id_stmt).one_or_none()
 
     if not workout_to_be_deleted:
         raise HTTPException(
-            status_code = status.HTTP_400_BAD_REQUEST,
-            detail = "Exercise not found or does not belong to the user."
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Workout not found."
+        )
+
+    if workout_to_be_deleted.user_id != user_id:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Forbidden: you do not have permission to delete this workout."
         )
 
     try:
@@ -376,21 +408,19 @@ async def delete_workout(*, workout_id : int = Path(..., title = "ID of the work
 @app.post("/workoutexercises", response_model = WorkoutExerciseResponse, openapi_extra = {"security" : [{"bearerAuth" : []}]})
 async def create_workoutexercise(workout_exercise_data : WorkoutExerciseRequest, user : dict = Security(validate_jwt), db : Session = Depends(get_db)):
     user_id = int(user["sub"])
+    # Ensure referenced Workout exists first (prioritize missing workout)
+    workout_obj = db.scalars(select(Workout).where(Workout.workout_id == workout_exercise_data.workout_id)).one_or_none()
+    if not workout_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found.")
+    if workout_obj.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: you cannot add sets to this workout.")
 
-    query = select(
-        and_(
-            select(Exercise).where(Exercise.exercise_id == workout_exercise_data.exercise_id, Exercise.user_id == user_id).exists(),
-            select(Workout).where(Workout.workout_id == workout_exercise_data.workout_id, Workout.user_id == user_id).exists()
-        )
-    )
-
-    result = db.scalars(query).one_or_none()
-
-    if not result:
-        raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Resource not found or unauthorized access."
-        )
+    # Ensure referenced Exercise exists
+    exercise_obj = db.scalars(select(Exercise).where(Exercise.exercise_id == workout_exercise_data.exercise_id)).one_or_none()
+    if not exercise_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found.")
+    if exercise_obj.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: you cannot use this exercise.")
 
     new_workout_exercise = WorkoutExercise(**workout_exercise_data.model_dump())
 
@@ -417,34 +447,29 @@ async def create_workoutexercise(workout_exercise_data : WorkoutExerciseRequest,
 async def get_all_sets_from_workout(workout_id: int = Path(..., title="ID of the workout to retrieve sets for."), user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
     user_id = int(user["sub"])
 
-    # ensure workout belongs to user
-    statement = select(Workout).where(and_(Workout.workout_id == workout_id, Workout.user_id == user_id))
-    workout = db.scalars(statement).one_or_none()
-
+    workout = db.scalars(select(Workout).where(Workout.workout_id == workout_id)).one_or_none()
     if not workout:
-        raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Workout not found or does not belong to this user."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found.")
+    if workout.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: you do not have permission to access sets for this workout.")
 
     sets_stmt = select(WorkoutExercise).where(WorkoutExercise.workout_id == workout_id)
     sets = db.scalars(sets_stmt).all()
 
     return sets
-
-
+    
+    return None
 @app.get("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", response_model = WorkoutExerciseResponse, openapi_extra={"security": [{"bearerAuth": []}]})
 async def get_single_set_from_workout(workout_id: int = Path(..., title="Workout ID"), exercise_id: int = Path(..., title="Exercise ID"), set_number: int = Path(..., title="Set number"), user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
     user_id = int(user["sub"])
-
-    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number, Workout.user_id == user_id)).join(Workout)
+    # find set by composite key
+    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number))
     requested_set = db.scalars(stmt).one_or_none()
-
     if not requested_set:
-        raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Set not found or does not belong to this user."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Set not found.")
+
+    if requested_set.workout.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: you do not have permission to access this set.")
 
     return requested_set
 
@@ -452,16 +477,12 @@ async def get_single_set_from_workout(workout_id: int = Path(..., title="Workout
 @app.put("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", response_model = WorkoutExerciseResponse, openapi_extra={"security": [{"bearerAuth": []}]})
 async def edit_set_from_workout(workout_id: int = Path(..., title="Workout ID"), exercise_id: int = Path(..., title="Exercise ID"), set_number: int = Path(..., title="Set number"), set_details: WorkoutExerciseRequest = None, user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
     user_id = int(user["sub"])
-
-    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number)).join(Workout)
+    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number))
     requested_set = db.scalars(stmt).one_or_none()
-
-    # ensure the workout belongs to the user
-    if not requested_set or requested_set.workout.user_id != user_id:
-        raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Set not found or does not belong to this user."
-        )
+    if not requested_set:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Set not found.")
+    if requested_set.workout.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: you do not have permission to modify this set.")
 
     # Update fields - allow updating weight and reps (and set_number only if consistent)
     # If client wants to change identifying keys (exercise_id or set_number), safe approach is to reject or require delete+create.
@@ -488,18 +509,17 @@ async def edit_set_from_workout(workout_id: int = Path(..., title="Workout ID"),
     return requested_set
 
 
-@app.delete("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", openapi_extra={"security": [{"bearerAuth": []}]})
+@app.delete("/workouts/{workout_id}/sets/{exercise_id}/{set_number}", status_code=status.HTTP_204_NO_CONTENT, openapi_extra={"security": [{"bearerAuth": []}]})
 async def delete_set_from_workout(workout_id: int = Path(..., title="Workout ID"), exercise_id: int = Path(..., title="Exercise ID"), set_number: int = Path(..., title="Set number"), user: dict = Security(validate_jwt), db: Session = Depends(get_db)):
     user_id = int(user["sub"])
 
-    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number)).join(Workout)
+    stmt = select(WorkoutExercise).where(and_(WorkoutExercise.workout_id == workout_id, WorkoutExercise.exercise_id == exercise_id, WorkoutExercise.set_number == set_number))
     set_to_delete = db.scalars(stmt).one_or_none()
 
-    if not set_to_delete or set_to_delete.workout.user_id != user_id:
-        raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Set not found or does not belong to this user."
-        )
+    if not set_to_delete:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Set not found.")
+    if set_to_delete.workout.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: you do not have permission to delete this set.")
 
     try:
         db.delete(set_to_delete)
@@ -517,7 +537,7 @@ async def delete_set_from_workout(workout_id: int = Path(..., title="Workout ID"
             detail = "A database error occurred."
         )
 
-    return status.HTTP_204_NO_CONTENT
+    return None
 
 
 @app.get("/prs", response_model = list[PRResponse], openapi_extra={"security": [{"bearerAuth": []}]})
