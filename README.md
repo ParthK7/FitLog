@@ -1,4 +1,4 @@
-# 🏋️‍♂️ Fitness Tracker API
+# 🏋️‍♂️ FitLog
 
 A backend application built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and **Alembic**. It provides user authentication, exercise and workout management, and personal record tracking.
 
