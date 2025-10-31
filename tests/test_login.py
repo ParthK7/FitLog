@@ -1,4 +1,6 @@
 from fastapi import status
+import pytest
+
 
 def test_login_success(client):
     user_data = {
@@ -23,6 +25,7 @@ def test_login_success(client):
     assert len(data["jwt_token"]) > 0
 
 
+
 def test_login_wrong_password(client):
     user_data = {
         "username": "wrongpassuser",
@@ -42,6 +45,7 @@ def test_login_wrong_password(client):
     assert body["detail"] == "Incorrect password for given credentials."
 
 
+
 def test_login_nonexistent_user(client):
     login_payload = {"username_or_email": "noone", "password": "nopass"}
     resp = client.post("/login", json=login_payload)
@@ -51,6 +55,7 @@ def test_login_nonexistent_user(client):
     body = resp.json()
     assert "detail" in body
     assert body["detail"] == "No user with the given emailID or username found. Register the user and then continue to login."
+
 
 
 def test_login_missing_fields(client):

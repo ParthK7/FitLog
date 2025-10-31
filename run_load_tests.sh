@@ -11,6 +11,9 @@ sleep 5
 
 #start locust
 echo "Starting locust tests"
+# Allow locustfile to cleanup test DB when finished. This must be enabled
+# explicitly to avoid accidental truncation of production DBs.
+export LOCUST_DB_CLEANUP=yes
 locust -f locustfile.py
 
 echo "Load test finished. Shutting down FastAPI server (PID: $UVICORN_PID)..."

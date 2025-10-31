@@ -1,4 +1,6 @@
 from fastapi import status
+import pytest
+
 
 def _get_auth_headers(client, username: str, password: str, email: str):
     register_payload = {"username": username, "password": password, "email": email}
@@ -20,7 +22,7 @@ def test_create_workout(client):
         "name": "Morning Session",
         "description": "Leg day",
         "date": "2025-10-23",
-        "start_time": "2025-10-23T07:30:00"
+        "start_time": "2025-10-23T07:30:00",
     }
     resp = client.post("/workouts", json=payload, headers=headers)
     assert resp.status_code == status.HTTP_200_OK
@@ -35,8 +37,10 @@ def test_get_all_and_single_workout(client):
 
     p1 = {"name": "A", "description": "a", "date": "2025-10-23", "start_time": "2025-10-23T08:00:00"}
     p2 = {"name": "B", "description": "b", "date": "2025-10-24", "start_time": "2025-10-24T09:00:00"}
-    r1 = client.post("/workouts", json=p1, headers=headers); assert r1.status_code == status.HTTP_200_OK
-    r2 = client.post("/workouts", json=p2, headers=headers); assert r2.status_code == status.HTTP_200_OK
+    r1 = client.post("/workouts", json=p1, headers=headers)
+    assert r1.status_code == status.HTTP_200_OK
+    r2 = client.post("/workouts", json=p2, headers=headers)
+    assert r2.status_code == status.HTTP_200_OK
 
     all_resp = client.get("/workouts", headers=headers)
     assert all_resp.status_code == status.HTTP_200_OK
@@ -51,7 +55,8 @@ def test_get_all_and_single_workout(client):
 def test_update_workout(client):
     headers = _get_auth_headers(client, "wuser3", "pw", "wuser3@example.com")
     p = {"name": "S", "description": "x", "date": "2025-10-23", "start_time": "2025-10-23T10:00:00"}
-    r = client.post("/workouts", json=p, headers=headers); assert r.status_code == status.HTTP_200_OK
+    r = client.post("/workouts", json=p, headers=headers)
+    assert r.status_code == status.HTTP_200_OK
     wid = r.json()["workout_id"]
 
     update = {"name": "Session Updated", "description": "updated", "date": "2025-10-25", "start_time": "2025-10-25T11:00:00"}
@@ -63,7 +68,8 @@ def test_update_workout(client):
 def test_delete_workout(client):
     headers = _get_auth_headers(client, "wuser4", "pw", "wuser4@example.com")
     p = {"name": "ToDelete", "description": "del", "date": "2025-10-23", "start_time": "2025-10-23T12:00:00"}
-    r = client.post("/workouts", json=p, headers=headers); assert r.status_code == status.HTTP_200_OK
+    r = client.post("/workouts", json=p, headers=headers)
+    assert r.status_code == status.HTTP_200_OK
     wid = r.json()["workout_id"]
 
     d = client.delete(f"/workouts/{wid}", headers=headers)

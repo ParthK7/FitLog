@@ -1,4 +1,6 @@
 from fastapi import status
+import pytest
+
 
 def _get_auth_headers(client, username: str, password: str, email: str):
     register_payload = {"username": username, "password": password, "email": email}
@@ -17,9 +19,11 @@ def test_create_workout_exercise_and_duplicate(client):
     headers = _get_auth_headers(client, "weuser1", "pw", "weuser1@example.com")
 
     # create exercise and workout
-    ex = client.post("/exercises", json={"name": "Push", "description": ""}, headers=headers); assert ex.status_code == status.HTTP_200_OK
+    ex = client.post("/exercises", json={"name": "Push", "description": ""}, headers=headers)
+    assert ex.status_code == status.HTTP_200_OK
     ex_id = ex.json()["exercise_id"]
-    w = client.post("/workouts", json={"name": "W1", "description": "", "date": "2025-10-23", "start_time": "2025-10-23T07:00:00"}, headers=headers); assert w.status_code == status.HTTP_200_OK
+    w = client.post("/workouts", json={"name": "W1", "description": "", "date": "2025-10-23", "start_time": "2025-10-23T07:00:00"}, headers=headers)
+    assert w.status_code == status.HTTP_200_OK
     w_id = w.json()["workout_id"]
 
     payload = {"workout_id": w_id, "exercise_id": ex_id, "set_number": 1, "weight": 100, "reps": 5}
@@ -34,12 +38,14 @@ def test_create_workout_exercise_and_duplicate(client):
 def test_create_workout_exercise_missing_and_forbidden(client):
     # prepare user A with exercise only
     headers_a = _get_auth_headers(client, "weuser2", "pw", "weuser2@example.com")
-    ex = client.post("/exercises", json={"name": "Dip", "description": ""}, headers=headers_a); assert ex.status_code == status.HTTP_200_OK
+    ex = client.post("/exercises", json={"name": "Dip", "description": ""}, headers=headers_a)
+    assert ex.status_code == status.HTTP_200_OK
     ex_id = ex.json()["exercise_id"]
 
     # User B has a workout
     headers_b = _get_auth_headers(client, "weuser3", "pw", "weuser3@example.com")
-    w = client.post("/workouts", json={"name": "WB", "description": "", "date": "2025-10-24", "start_time": "2025-10-24T08:00:00"}, headers=headers_b); assert w.status_code == status.HTTP_200_OK
+    w = client.post("/workouts", json={"name": "WB", "description": "", "date": "2025-10-24", "start_time": "2025-10-24T08:00:00"}, headers=headers_b)
+    assert w.status_code == status.HTTP_200_OK
     w_id = w.json()["workout_id"]
 
     # Try to create referencing non-existent exercise
@@ -61,14 +67,18 @@ def test_create_workout_exercise_missing_and_forbidden(client):
 
 def test_sets_crud_and_ownership(client):
     headers = _get_auth_headers(client, "weuser4", "pw", "weuser4@example.com")
-    ex = client.post("/exercises", json={"name": "Clean", "description": ""}, headers=headers); assert ex.status_code == status.HTTP_200_OK
+    ex = client.post("/exercises", json={"name": "Clean", "description": ""}, headers=headers)
+    assert ex.status_code == status.HTTP_200_OK
     ex_id = ex.json()["exercise_id"]
-    w = client.post("/workouts", json={"name": "W2", "description": "", "date": "2025-10-25", "start_time": "2025-10-25T09:00:00"}, headers=headers); assert w.status_code == status.HTTP_200_OK
+    w = client.post("/workouts", json={"name": "W2", "description": "", "date": "2025-10-25", "start_time": "2025-10-25T09:00:00"}, headers=headers)
+    assert w.status_code == status.HTTP_200_OK
     w_id = w.json()["workout_id"]
 
     # create two sets
-    s1 = client.post("/workoutexercises", json={"workout_id": w_id, "exercise_id": ex_id, "set_number": 1, "weight": 80, "reps": 3}, headers=headers); assert s1.status_code == status.HTTP_200_OK
-    s2 = client.post("/workoutexercises", json={"workout_id": w_id, "exercise_id": ex_id, "set_number": 2, "weight": 85, "reps": 2}, headers=headers); assert s2.status_code == status.HTTP_200_OK
+    s1 = client.post("/workoutexercises", json={"workout_id": w_id, "exercise_id": ex_id, "set_number": 1, "weight": 80, "reps": 3}, headers=headers)
+    assert s1.status_code == status.HTTP_200_OK
+    s2 = client.post("/workoutexercises", json={"workout_id": w_id, "exercise_id": ex_id, "set_number": 2, "weight": 85, "reps": 2}, headers=headers)
+    assert s2.status_code == status.HTTP_200_OK
 
     # get all sets for workout
     all_sets = client.get(f"/workouts/{w_id}/sets", headers=headers)

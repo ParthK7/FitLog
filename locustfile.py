@@ -3,7 +3,7 @@ from locust.exception import StopUser
 from fastapi import status
 import random
 import os
-import psycopg2
+import asyncpg
 
 class UserFlow(SequentialTaskSet):
     def __init__(self, parent):

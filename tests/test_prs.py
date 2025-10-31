@@ -1,4 +1,6 @@
 from fastapi import status
+import pytest
+
 
 def _get_auth_headers(client, username: str, password: str, email: str):
     register_payload = {"username": username, "password": password, "email": email}
@@ -56,9 +58,11 @@ def test_prs_ownership_and_empty(client):
     """Ensure PRs are per-user and empty when user has no data."""
     # User A creates a workout and set
     headers_a = _get_auth_headers(client, "pruserA", "pw", "prA@example.com")
-    ex = client.post("/exercises", json={"name": "Row", "description": ""}, headers=headers_a); assert ex.status_code == status.HTTP_200_OK
+    ex = client.post("/exercises", json={"name": "Row", "description": ""}, headers=headers_a)
+    assert ex.status_code == status.HTTP_200_OK
     ex_id = ex.json()["exercise_id"]
-    w = client.post("/workouts", json={"name": "WA", "description": "", "date": "2025-10-22", "start_time": "2025-10-22T07:00:00"}, headers=headers_a); assert w.status_code == status.HTTP_200_OK
+    w = client.post("/workouts", json={"name": "WA", "description": "", "date": "2025-10-22", "start_time": "2025-10-22T07:00:00"}, headers=headers_a)
+    assert w.status_code == status.HTTP_200_OK
     w_id = w.json()["workout_id"]
     client.post("/workoutexercises", json={"workout_id": w_id, "exercise_id": ex_id, "set_number": 1, "weight": 60, "reps": 5}, headers=headers_a)
 
