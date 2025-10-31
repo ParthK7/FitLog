@@ -13,9 +13,6 @@ class RegisterUserOut(BaseModel):
     email : str
     model_config = ConfigDict(from_attributes = True)
 
-    # class Config:
-    #     from_attributes = True
-
 class LoginModel(BaseModel):
     username_or_email : str
     password : str
