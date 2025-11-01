@@ -3,15 +3,17 @@ from locust.exception import StopUser
 from fastapi import status
 import random
 import os
-import asyncpg
+import psycopg2
+from dotenv import load_dotenv
 
 class UserFlow(SequentialTaskSet):
     def __init__(self, parent):
         super().__init__(parent)
-        self.exercise_list = ["Dumbbell Press", "Barbell Row", "Leg Extension", "Bench Press"]
+        self.all_exercises = ["Dumbbell Press", "Barbell Row", "Leg Extension", "Bench Press", "Overhead Press", "Squat"]
 
     def on_start(self):
-        random_number = random.randint(1, 1000)
+        self.exercise_list = list(self.all_exercises)
+        random_number = random.randint(1, 100000)
 
         reg_resp = self.client.post("/register", json = {
             "username" : f"locustest_{random_number}",
@@ -32,7 +34,7 @@ class UserFlow(SequentialTaskSet):
             self.jwt_token = data["jwt_token"]
         
         else:
-            raise StopUser()
+            raise StopUser() 	
 
         self.auth_headers = {
             "Authorization" : f"Bearer {self.jwt_token}"
@@ -41,6 +43,9 @@ class UserFlow(SequentialTaskSet):
     #1. creating an exercise
     @task
     def create_first_exercise(self):
+        if not self.exercise_list:
+            raise StopUser()
+            
         exercise_name = self.exercise_list.pop()
 
         exercise_data = {
@@ -52,10 +57,15 @@ class UserFlow(SequentialTaskSet):
         if exercise1_creation.status_code == status.HTTP_200_OK:
             exercise1_response = exercise1_creation.json()
             self.exercise1_id = exercise1_response["exercise_id"]
+        else:
+            raise StopUser()
 
     #2. creating another exercise
     @task
     def create_second_exercise(self):
+        if not self.exercise_list:
+            raise StopUser()
+            
         exercise_name = self.exercise_list.pop()
 
         exercise_data = {
@@ -67,10 +77,15 @@ class UserFlow(SequentialTaskSet):
         if exercise2_creation.status_code == status.HTTP_200_OK:
             exercise2_response = exercise2_creation.json()
             self.exercise2_id = exercise2_response["exercise_id"]
+        else:
+            raise StopUser()
 
     #3. one last exercise
     @task
     def create_third_exercise(self):
+        if not self.exercise_list:
+            raise StopUser()
+            
         exercise_name = self.exercise_list.pop()
 
         exercise_data = {
@@ -82,6 +97,8 @@ class UserFlow(SequentialTaskSet):
         if exercise3_creation.status_code == status.HTTP_200_OK:
             exercise3_response = exercise3_creation.json()
             self.exercise3_id = exercise3_response["exercise_id"]
+        else:
+            raise StopUser()
 
     #4. create a workout
     @task
@@ -97,10 +114,15 @@ class UserFlow(SequentialTaskSet):
         if workout_resp.status_code == status.HTTP_200_OK:
             workout_response = workout_resp.json()
             self.workout1_id = workout_response["workout_id"] 
+        else:
+            raise StopUser()
 
     #5. Add first set
     @task
     def add_first_set(self):
+        if not hasattr(self, 'workout1_id') or not hasattr(self, 'exercise1_id'):
+            return 
+            
         set_data = {
             "workout_id": self.workout1_id,
             "exercise_id": self.exercise1_id,
@@ -114,6 +136,9 @@ class UserFlow(SequentialTaskSet):
     #6. Add second set
     @task
     def add_second_set(self):
+        if not hasattr(self, 'workout1_id') or not hasattr(self, 'exercise1_id'):
+            return 
+            
         set_data = {
             "workout_id": self.workout1_id,
             "exercise_id": self.exercise1_id,
@@ -127,6 +152,9 @@ class UserFlow(SequentialTaskSet):
     #7. Add first set for another exercise
     @task
     def add_first_set_2(self):
+        if not hasattr(self, 'workout1_id') or not hasattr(self, 'exercise2_id'):
+            return
+            
         set_data = {
             "workout_id": self.workout1_id,
             "exercise_id": self.exercise2_id,
@@ -140,6 +168,9 @@ class UserFlow(SequentialTaskSet):
     #8. Add second set for another exercise
     @task
     def add_second_set_2(self):
+        if not hasattr(self, 'workout1_id') or not hasattr(self, 'exercise2_id'):
+            return
+            
         set_data = {
             "workout_id": self.workout1_id,
             "exercise_id": self.exercise2_id,
@@ -169,10 +200,15 @@ class UserFlow(SequentialTaskSet):
         if workout_resp.status_code == status.HTTP_200_OK:
             workout_response = workout_resp.json()
             self.workout2_id = workout_response["workout_id"] 
+        else:
+            raise StopUser()
 
     #11. Add first set of one exercise
     @task
     def add_first_set_3(self):
+        if not hasattr(self, 'workout2_id') or not hasattr(self, 'exercise2_id'):
+            return
+            
         set_data = {
             "workout_id": self.workout2_id,
             "exercise_id": self.exercise2_id,
@@ -186,6 +222,9 @@ class UserFlow(SequentialTaskSet):
     #12. Add second set of one exercise
     @task
     def add_second_set_3(self):
+        if not hasattr(self, 'workout2_id') or not hasattr(self, 'exercise2_id'):
+            return
+            
         set_data = {
             "workout_id": self.workout2_id,
             "exercise_id": self.exercise2_id,
@@ -199,6 +238,9 @@ class UserFlow(SequentialTaskSet):
     #13. Add first set of another exercise
     @task
     def add_first_set_4(self):
+        if not hasattr(self, 'workout2_id') or not hasattr(self, 'exercise3_id'):
+            return
+            
         set_data = {
             "workout_id": self.workout2_id,
             "exercise_id": self.exercise3_id,
@@ -212,6 +254,9 @@ class UserFlow(SequentialTaskSet):
     #14. Add another set of another exercise. 
     @task
     def add_second_set_4(self):
+        if not hasattr(self, 'workout2_id') or not hasattr(self, 'exercise3_id'):
+            return
+            
         set_data = {
             "workout_id": self.workout2_id,
             "exercise_id": self.exercise3_id,
@@ -230,6 +275,9 @@ class UserFlow(SequentialTaskSet):
     #16. Add one exercise. 
     @task
     def add_final_exercise(self):
+        if not self.exercise_list:
+            raise StopUser()
+            
         exercise_name = self.exercise_list.pop()
 
         exercise_data = {
@@ -241,10 +289,15 @@ class UserFlow(SequentialTaskSet):
         if exercise4_creation.status_code == status.HTTP_200_OK:
             exercise4_response = exercise4_creation.json()
             self.exercise4_id = exercise4_response["exercise_id"]
+        else:
+            raise StopUser()
 
-    #17. Edit the first exericse you created
+    #17. Edit the first exericse 
     @task
     def edit_first_exercise(self):
+        if not hasattr(self, 'exercise1_id'):
+            return
+            
         new_data = {
             "name" : "custom",
             "description" : ""
@@ -254,7 +307,9 @@ class UserFlow(SequentialTaskSet):
         if exercise_update.status_code == status.HTTP_200_OK:
             exercise_update_response = exercise_update.json()
             self.updated_exercise_id = exercise_update_response["exercise_id"]
-
+        else:
+            self.updated_exercise_id = self.exercise1_id
+            
     #18. Get all exercises
     @task
     def all_exercises1(self):
@@ -263,16 +318,28 @@ class UserFlow(SequentialTaskSet):
     #. Get first exercise
     @task
     def first_exercise(self):
-        self.client.get(f"/exercises/{self.updated_exercise_id}", headers = self.auth_headers)
+        if not hasattr(self, 'updated_exercise_id') and not hasattr(self, 'exercise1_id'):
+            return
+            
+        target_id = getattr(self, 'updated_exercise_id', getattr(self, 'exercise1_id', None))
+        
+        if target_id:
+            self.client.get(f"/exercises/{target_id}", headers = self.auth_headers)
 
     #get first workout
     @task
     def first_workout(self):
+        if not hasattr(self, 'workout1_id'):
+            return
+            
         self.client.get(f"/workouts/{self.workout1_id}", headers = self.auth_headers)
 
-    #19. Delete the second exercise that you created. 
+    #19. Delete the second exercise 
     @task
     def delete_second_exercise(self):
+        if not hasattr(self, 'exercise2_id'):
+            return
+            
         self.client.delete(f"/exercises/{self.exercise2_id}", headers = self.auth_headers)
 
     #20. Get all exercises.
@@ -288,18 +355,24 @@ class AppUser(HttpUser):
     wait_time = between(1, 5)
 
 
+load_dotenv()
 @events.quitting.add_listener
 def on_locust_quit(environment, **kwargs):
     print("\n--- Starting Automatic Test Database Cleanup ---")
 
-    db_url = os.environ.get("DATABASE_URL")
+    db_url = os.environ.get("DB_LINK")
 
     if not db_url:
         print("Test database url is not found hence cannot clean the database.")
         return
+
+    if "+asyncpg" in db_url:
+        clean_db_url = db_url.replace("+asyncpg", "")
+    else:
+        clean_db_url = db_url
     
     try:
-        connection = psycopg2.connect(db_url)
+        connection = psycopg2.connect(clean_db_url)
         cursor = connection.cursor()
 
         print("Truncating tables")
@@ -315,5 +388,3 @@ def on_locust_quit(environment, **kwargs):
     except Exception as e:
         print(f"ERROR during database cleanup: {e}")
         print("!!! Database may not be clean. Manual check is required. !!!")
-
-
